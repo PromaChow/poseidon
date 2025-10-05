@@ -1,20 +1,45 @@
-name: 'Close stale issues and PRs'
+name: Close stale issues and PRs
 on:
-  schedule:
-    - cron: '30 1 * * *'
+  push:
+    branches:
+      - main
 
 jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/stale@v8
         with:
-          stale-issue-message: 'This issue is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days.'
-          stale-pr-message: 'This PR is stale because it has been open 45 days with no activity. Remove stale label or comment or this will be closed in 10 days.'
-          close-issue-message: 'This issue was closed because it has been stalled for 5 days with no activity.'
-          close-pr-message: 'This PR was closed because it has been stalled for 10 days with no activity.'
-          days-before-issue-stale: 30
-          days-before-pr-stale: 45
+          close-issue-message: This issue was closed because it has been stalled for
+            5 days with no activity.
+          close-pr-message: This PR was closed because it has been stalled for 10
+            days with no activity.
           days-before-issue-close: 5
+          days-before-issue-stale: 30
           days-before-pr-close: 10
-          exempt-issue-labels: 'dependencies'
+          days-before-pr-stale: 45
+          exempt-issue-labels: dependencies
+          stale-issue-message: This issue is stale because it has been open 30 days
+            with no activity. Remove stale label or comment or this will be closed
+            in 5 days.
+          stale-pr-message: This PR is stale because it has been open 45 days with
+            no activity. Remove stale label or comment or this will be closed in 10
+            days.
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json

@@ -1,51 +1,93 @@
 name: buildx
-
 on:
   push:
-    branches: main
-    tags: 'v*'
+    branches:
+      - main
 
 jobs:
   buildx:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - name: Get the version
-      id: get_version
-      run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
-    - name: Change for main
-      id: change_version
-      run: if [ "${{ steps.get_version.outputs.VERSION }}" == "main" ]; then echo ::set-output name=VERSION::latest; else echo ::set-output name=VERSION::${{ steps.get_version.outputs.VERSION }}; fi
-    - name: Set up qemu
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: all
-    - name: Set up Docker Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v2
-      with:
-        version: latest
-    - name: Docker Login
-      env:
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_TOKEN }}
-      run: |
-        echo "${DOCKER_PASSWORD}" | docker login --username "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-      if: github.repository == 'iqtlabs/poseidon' && github.event_name == 'push'
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - id: get_version
+        name: Get the version
+        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+      - id: measurement-3
+        name: Record Measurement After Get the version
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Get the version
+          task: get-measurement
+      - id: change_version
+        name: Change for main
+        run: if [ "${{ steps.get_version.outputs.VERSION }}" == "main" ]; then echo
+          ::set-output name=VERSION::latest; else echo ::set-output name=VERSION::${{
+          steps.get_version.outputs.VERSION }}; fi
+      - id: measurement-5
+        name: Record Measurement After Change for main
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Change for main
+          task: get-measurement
+      - name: Set up qemu
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+      - id: buildx
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: latest
+      - env:
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_TOKEN }}
+        if: github.repository == 'iqtlabs/poseidon' && github.event_name == 'push'
+        name: Docker Login
+        run: 'echo "${DOCKER_PASSWORD}" | docker login --username "${{ secrets.DOCKER_USERNAME
+          }}" --password-stdin
 
-    - name: Build and push platforms
-      env:
-        DOCKER_CLI_EXPERIMENTAL: enabled
-      run: |
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --push \
-          -t iqtlabs/poseidon:${{ steps.change_version.outputs.VERSION }} . && \
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --push \
-          -t iqtlabs/poseidon-workers:${{ steps.change_version.outputs.VERSION }} workers
-      if: github.repository == 'iqtlabs/poseidon' && github.event_name == 'push'
+          '
+      - id: measurement-9
+        name: Record Measurement After Docker Login
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Docker Login
+          task: get-measurement
+      - env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
+        if: github.repository == 'iqtlabs/poseidon' && github.event_name == 'push'
+        name: Build and push platforms
+        run: "docker buildx build \\\n  --platform linux/amd64,linux/arm64 \\\n  --push\
+          \ \\\n  -t iqtlabs/poseidon:${{ steps.change_version.outputs.VERSION }}\
+          \ . && \\\ndocker buildx build \\\n  --platform linux/amd64,linux/arm64\
+          \ \\\n  --push \\\n  -t iqtlabs/poseidon-workers:${{ steps.change_version.outputs.VERSION\
+          \ }} workers\n"
+      - id: measurement-11
+        name: Record Measurement After Build and push platforms
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Build and push platforms
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json

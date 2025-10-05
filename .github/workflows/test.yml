@@ -1,26 +1,70 @@
 name: test
-
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   test:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - name: shell_test
-      run: |
-        wget "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz" && \
-        tar --xz -xvf "shellcheck-stable.linux.x86_64.tar.xz" && \
-        shellcheck() { "shellcheck-stable/shellcheck" "$@"; } && \
-        shellcheck --version && \
-        /bin/bash --version && /bin/bash -n bin/poseidon && shellcheck -x -e SC2016 -e SC2119 -e SC2129 -e SC2001 -e SC2038 -e SC2044 bin/poseidon
-    - name: e2e_test
-      run: |
-        export DEBIAN_FRONTEND=noninteractive && \
-        echo 'debconf debconf/frontend select Noninteractive' | sudo debconf-set-selections
-        sudo apt-get update && sudo apt-get install -y libev-dev tshark wget jq tcpreplay tcpdump
-        docker system prune -a -f --volumes && ./tests/test_e2e.sh
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: shell_test
+        run: 'wget "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz"
+          && \
+
+          tar --xz -xvf "shellcheck-stable.linux.x86_64.tar.xz" && \
+
+          shellcheck() { "shellcheck-stable/shellcheck" "$@"; } && \
+
+          shellcheck --version && \
+
+          /bin/bash --version && /bin/bash -n bin/poseidon && shellcheck -x -e SC2016
+          -e SC2119 -e SC2129 -e SC2001 -e SC2038 -e SC2044 bin/poseidon
+
+          '
+      - id: measurement-3
+        name: Record Measurement After shell_test
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: shell_test
+          task: get-measurement
+      - name: e2e_test
+        run: 'export DEBIAN_FRONTEND=noninteractive && \
+
+          echo ''debconf debconf/frontend select Noninteractive'' | sudo debconf-set-selections
+
+          sudo apt-get update && sudo apt-get install -y libev-dev tshark wget jq
+          tcpreplay tcpdump
+
+          docker system prune -a -f --volumes && ./tests/test_e2e.sh
+
+          '
+      - id: measurement-5
+        name: Record Measurement After e2e_test
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: e2e_test
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json

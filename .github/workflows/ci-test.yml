@@ -1,75 +1,151 @@
 name: CI Test
-
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-
   ci-test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [ '3.8', '3.9', '3.10' ]
-
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
+          version: 1.4.2
           virtualenvs-create: true
           virtualenvs-in-project: true
-          version: 1.4.2
-      - name: Load cached venv
-        id: cached-poetry-dependencies
+      - id: cached-poetry-dependencies
+        name: Load cached venv
         uses: actions/cache@v3
         with:
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version
+            }}-${{ hashFiles('**/poetry.lock') }}
           path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
-      - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc git g++ libev-dev libyaml-dev
+      - if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        name: Install dependencies
+        run: 'sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          gcc git g++ libev-dev libyaml-dev
+
           cd lib/poseidon_api && poetry install --no-interaction && cd ../../
+
           cd lib/poseidon_cli && poetry install --no-interaction && cd ../../
+
           cd lib/poseidon_core && poetry install --no-interaction && cd ../../
 
+          '
+      - id: measurement-6
+        name: Record Measurement After Install dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install dependencies
+          task: get-measurement
       - name: Code Quality - Black
-        run: |
-          cd lib/poseidon_api && poetry run black . --check && cd ../../
+        run: 'cd lib/poseidon_api && poetry run black . --check && cd ../../
+
           cd lib/poseidon_cli && poetry run black . --check && cd ../../
+
           cd lib/poseidon_core && poetry run black . --check && cd ../../
 
+          '
+      - id: measurement-8
+        name: Record Measurement After Code Quality - Black
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Code Quality - Black
+          task: get-measurement
       - name: Code Quality - Pytype
-        run: |
-          cd lib/poseidon_api && poetry run pytype poseidon_api/ && cd ../../
+        run: 'cd lib/poseidon_api && poetry run pytype poseidon_api/ && cd ../../
+
           cd lib/poseidon_cli && poetry run pytype poseidon_cli/ && cd ../../
+
           cd lib/poseidon_core && poetry run pytype poseidon_core/ && cd ../../
 
-      - name: Code Quality - Pylint
-        run: |
-          cd lib/poseidon_api && poetry run pylint --fail-under=4 poseidon_api/ && cd ../../
-          cd lib/poseidon_cli && poetry run pylint --fail-under=4 poseidon_cli/ && cd ../../
-          cd lib/poseidon_core && poetry run pylint --fail-under=4 poseidon_core/ && cd ../../
-
-      - name: Test with pytest
-        # https://github.com/python-poetry/poetry/issues/4511
-        # TODO: setuptools needed by c65faucet, but poetry < 1.2.0 does not allow adding setuptools.
-        run: |
-          export POSEIDON_CONFIG=$PWD/config/poseidon.config
-          cd lib/poseidon_api && poetry run pip install 'setuptools==64.0.3' && poetry run pytest --cov-report term-missing --cov=. --cov-report=xml && cd ../../
-          cd lib/poseidon_cli && poetry run pip install 'setuptools==64.0.3' && poetry run pytest --cov-report term-missing --cov=. --cov-report=xml && cd ../../
-          cd lib/poseidon_core && poetry run pip install 'setuptools==64.0.3' && poetry run pytest --cov-report term-missing --cov=. --cov-report=xml && cd ../../
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        if: github.repository == 'faucetsdn/poseidon' && github.ref_name == 'main'
+          '
+      - id: measurement-10
+        name: Record Measurement After Code Quality - Pytype
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: /home/runner/work/poseidon/poseidon/lib/poseidon_api/coverage.xml,/home/runner/work/poseidon/poseidon/lib/poseidon_cli/coverage.xml,/home/runner/work/poseidon/poseidon/lib/poseidon_core/coverage.xml
+          json-output: true
+          label: Code Quality - Pytype
+          task: get-measurement
+      - name: Code Quality - Pylint
+        run: 'cd lib/poseidon_api && poetry run pylint --fail-under=4 poseidon_api/
+          && cd ../../
+
+          cd lib/poseidon_cli && poetry run pylint --fail-under=4 poseidon_cli/ &&
+          cd ../../
+
+          cd lib/poseidon_core && poetry run pylint --fail-under=4 poseidon_core/
+          && cd ../../
+
+          '
+      - id: measurement-12
+        name: Record Measurement After Code Quality - Pylint
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Code Quality - Pylint
+          task: get-measurement
+      - name: Test with pytest
+        run: 'export POSEIDON_CONFIG=$PWD/config/poseidon.config
+
+          cd lib/poseidon_api && poetry run pip install ''setuptools==64.0.3'' &&
+          poetry run pytest --cov-report term-missing --cov=. --cov-report=xml &&
+          cd ../../
+
+          cd lib/poseidon_cli && poetry run pip install ''setuptools==64.0.3'' &&
+          poetry run pytest --cov-report term-missing --cov=. --cov-report=xml &&
+          cd ../../
+
+          cd lib/poseidon_core && poetry run pip install ''setuptools==64.0.3'' &&
+          poetry run pytest --cov-report term-missing --cov=. --cov-report=xml &&
+          cd ../../
+
+          '
+      - id: measurement-14
+        name: Record Measurement After Test with pytest
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Test with pytest
+          task: get-measurement
+      - if: github.repository == 'faucetsdn/poseidon' && github.ref_name == 'main'
+        name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
           fail_ci_if_error: true
+          files: /home/runner/work/poseidon/poseidon/lib/poseidon_api/coverage.xml,/home/runner/work/poseidon/poseidon/lib/poseidon_cli/coverage.xml,/home/runner/work/poseidon/poseidon/lib/poseidon_core/coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      matrix:
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
